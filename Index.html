@@ -1,200 +1,172 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
   <title>SOUNDIFY</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/materialize-css@1.0.0/dist/css/materialize.min.css" rel="stylesheet">
   <style>
-    body {
-      background: #121212;
-      color: white;
-    }
-    .nav-wrapper {
-      background: #1DB954;
-    }
-    .music-card {
-      background: #1e1e1e;
-      border-radius: 12px;
-      padding: 15px;
-      transition: transform 0.3s;
-    }
-    .music-card:hover {
-      transform: scale(1.02);
-    }
-    audio {
-      width: 100%;
-      margin-top: 10px;
-    }
-    canvas {
-      width: 100%;
-      height: 60px;
-      display: block;
-      background: #222;
-      border-radius: 8px;
-      margin-top: 10px;
-    }
-    #upload-form, #admin-dashboard {
-      margin: 30px 0;
-      display: none;
+    body { background: #121212; color: white; }
+    .track-card { margin: 10px; border-radius: 10px; }
+    .progress-bar { width: 100%; height: 5px; background: #333; }
+    .progress-fill { height: 100%; background: #1db954; }
+    .visualizer { display: flex; gap: 2px; height: 30px; margin-top: 10px; }
+    .bar { width: 5px; background: #1db954; animation: pulse 1s infinite ease-in-out; }
+    @keyframes pulse {
+      0%, 100% { height: 10px; }
+      50% { height: 30px; }
     }
   </style>
 </head>
 <body>
-  <nav>
-    <div class="nav-wrapper">
-      <a href="#" class="brand-logo center">SOUNDIFY</a>
-      <ul class="right">
-        <li><a id="logoutBtn" class="btn-flat white-text" style="display:none;">Logout</a></li>
-      </ul>
-    </div>
-  </nav>
-
   <div class="container">
-    <!-- Auth Section -->
-    <div id="auth-section" class="center-align" style="margin-top: 50px;">
-      <h4>Welcome to SOUNDIFY</h4>
-      <input type="email" id="email" placeholder="Email" class="white-text">
-      <input type="password" id="password" placeholder="Password" class="white-text">
-      <div style="margin-top: 20px;">
-        <button id="loginBtn" class="btn green">Login</button>
-        <button id="signupBtn" class="btn blue">Sign Up</button>
+    <h4 class="center-align">🎵 SOUNDIFY</h4>
+    <div id="auth-section">
+      <div class="input-field"><input id="email" type="email"><label for="email">Email</label></div>
+      <div class="input-field"><input id="password" type="password"><label for="password">Password</label></div>
+      <button class="btn green" onclick="login()">Login</button>
+      <button class="btn blue" onclick="signup()">Sign Up</button>
+    </div>
+
+    <div id="main-section" style="display:none;">
+      <input type="text" id="search" placeholder="Search music..." class="browser-default">
+      <div id="tracks" class="row"></div>
+      <div class="center-align">
+        <audio id="player" controls></audio>
+        <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+        <div class="visualizer">
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        </div>
+        <button class="btn red" onclick="logout()">Logout</button>
+        <button class="btn" onclick="showUpload()" id="upload-btn" style="display:none;">Upload (Admin)</button>
       </div>
     </div>
 
-    <!-- Admin Dashboard -->
-    <div id="admin-dashboard" class="card-panel grey darken-3">
-      <h5>Admin Dashboard</h5>
-      <p>Total Songs: <span id="totalTracks">0</span></p>
-    </div>
-
-    <!-- Upload for Admin -->
-    <div id="upload-form" class="card-panel">
-      <h5>Upload New Track</h5>
-      <input type="file" id="musicFile" />
-      <input type="text" id="artistInput" placeholder="Artist" />
-      <input type="text" id="albumInput" placeholder="Album" />
-      <button class="btn green" id="uploadBtn">Upload</button>
-    </div>
-
-    <!-- Search & Music -->
-    <div id="music-section" style="display:none;">
-      <input type="text" id="searchInput" placeholder="Search music..." class="white-text">
-      <div class="row" id="music-list"></div>
+    <div id="upload-section" style="display:none;">
+      <input type="text" id="track-name" placeholder="Track Name" class="browser-default"><br>
+      <input type="text" id="artist" placeholder="Artist" class="browser-default"><br>
+      <input type="text" id="album" placeholder="Album" class="browser-default"><br>
+      <input type="file" id="upload-file" accept="audio/*"><br><br>
+      <button class="btn green" onclick="uploadTrack()">Upload Track</button>
     </div>
   </div>
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-storage-compat.js"></script>
+  <script src="/firebase-config.js"></script>
+  <script>
+    let userToken = "";
+    const auth = firebase.auth();
+    const storage = firebase.storage();
 
-  <!-- Materialize -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    auth.onAuthStateChanged(async user => {
+      if (user) {
+        userToken = await user.getIdToken();
+        document.getElementById("auth-section").style.display = "none";
+        document.getElementById("main-section").style.display = "block";
 
-  <!-- Custom JS -->
-  <script src="script.js"></script>
-</body>
-        </html><!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SOUNDIFY</title>
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
-  <style>
-    body {
-      background: #121212;
-      color: white;
+        const tokenResult = await user.getIdTokenResult();
+        if (tokenResult.claims.admin) {
+          document.getElementById("upload-btn").style.display = "inline-block";
+        }
+
+        loadTracks();
+      }
+    });
+
+    function signup() {
+      const email = emailInput().value, pass = passInput().value;
+      auth.createUserWithEmailAndPassword(email, pass);
     }
-    .nav-wrapper {
-      background: #1DB954;
+
+    function login() {
+      const email = emailInput().value, pass = passInput().value;
+      auth.signInWithEmailAndPassword(email, pass);
     }
-    .music-card {
-      background: #1e1e1e;
-      border-radius: 12px;
-      padding: 15px;
-      transition: transform 0.3s;
+
+    function logout() {
+      auth.signOut();
+      location.reload();
     }
-    .music-card:hover {
-      transform: scale(1.02);
+
+    function emailInput() { return document.getElementById("email"); }
+    function passInput() { return document.getElementById("password"); }
+
+    async function loadTracks() {
+      const list = await storage.ref("tracks").listAll();
+      const trackDiv = document.getElementById("tracks");
+      trackDiv.innerHTML = "";
+
+      for (const item of list.items) {
+        const url = await item.getDownloadURL();
+        const name = item.name;
+        trackDiv.innerHTML += `
+          <div class="col s12 m4">
+            <div class="card black track-card">
+              <div class="card-content white-text">
+                <span class="card-title">${name}</span>
+                <p>Artist: Unknown</p>
+                <p>Album: Unknown</p>
+              </div>
+              <div class="card-action">
+                <a class="btn-small green" onclick="playTrack('${url}')">Play</a>
+                <a class="btn-small" href="${url}" download>Download</a>
+              </div>
+            </div>
+          </div>`;
+      }
     }
-    audio {
-      width: 100%;
-      margin-top: 10px;
+
+    function playTrack(url) {
+      const player = document.getElementById("player");
+      player.src = url;
+      player.play();
+
+      const progress = document.getElementById("progress");
+      player.ontimeupdate = () => {
+        progress.style.width = (player.currentTime / player.duration * 100) + "%";
+      };
     }
-    canvas {
-      width: 100%;
-      height: 60px;
-      display: block;
-      background: #222;
-      border-radius: 8px;
-      margin-top: 10px;
+
+    function showUpload() {
+      document.getElementById("upload-section").style.display = "block";
     }
-    #upload-form, #admin-dashboard {
-      margin: 30px 0;
-      display: none;
+
+    async function uploadTrack() {
+      const file = document.getElementById("upload-file").files[0];
+      const reader = new FileReader();
+      reader.onload = async e => {
+        const base64 = e.target.result.split(',')[1];
+        const res = await fetch("/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: document.getElementById("track-name").value,
+            artist: document.getElementById("artist").value,
+            album: document.getElementById("album").value,
+            base64,
+            token: userToken
+          })
+        });
+        if (res.ok) {
+          alert("Uploaded!");
+          document.getElementById("upload-section").style.display = "none";
+          loadTracks();
+        }
+      };
+      reader.readAsDataURL(file);
     }
-  </style>
-</head>
-<body>
-  <nav>
-    <div class="nav-wrapper">
-      <a href="#" class="brand-logo center">SOUNDIFY</a>
-      <ul class="right">
-        <li><a id="logoutBtn" class="btn-flat white-text" style="display:none;">Logout</a></li>
-      </ul>
-    </div>
-  </nav>
 
-  <div class="container">
-    <!-- Auth Section -->
-    <div id="auth-section" class="center-align" style="margin-top: 50px;">
-      <h4>Welcome to SOUNDIFY</h4>
-      <input type="email" id="email" placeholder="Email" class="white-text">
-      <input type="password" id="password" placeholder="Password" class="white-text">
-      <div style="margin-top: 20px;">
-        <button id="loginBtn" class="btn green">Login</button>
-        <button id="signupBtn" class="btn blue">Sign Up</button>
-      </div>
-    </div>
-
-    <!-- Admin Dashboard -->
-    <div id="admin-dashboard" class="card-panel grey darken-3">
-      <h5>Admin Dashboard</h5>
-      <p>Total Songs: <span id="totalTracks">0</span></p>
-    </div>
-
-    <!-- Upload for Admin -->
-    <div id="upload-form" class="card-panel">
-      <h5>Upload New Track</h5>
-      <input type="file" id="musicFile" />
-      <input type="text" id="artistInput" placeholder="Artist" />
-      <input type="text" id="albumInput" placeholder="Album" />
-      <button class="btn green" id="uploadBtn">Upload</button>
-    </div>
-
-    <!-- Search & Music -->
-    <div id="music-section" style="display:none;">
-      <input type="text" id="searchInput" placeholder="Search music..." class="white-text">
-      <div class="row" id="music-list"></div>
-    </div>
-  </div>
-
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
-  <!-- Materialize -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
-
-  <!-- Custom JS -->
-  <script src="script.js"></script>
+    document.getElementById("search").addEventListener("input", e => {
+      const val = e.target.value.toLowerCase();
+      document.querySelectorAll(".card-title").forEach(el => {
+        const card = el.closest(".card");
+        card.style.display = el.innerText.toLowerCase().includes(val) ? "" : "none";
+      });
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/materialize-css@1.0.0/dist/js/materialize.min.js"></script>
 </body>
 </html>
