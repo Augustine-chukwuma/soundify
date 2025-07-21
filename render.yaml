@@ -1,1 +1,6 @@
-
+services:
+  - type: static
+    name: soundify-frontend
+    staticPublishPath: public
+    buildCommand: ""
+    env: static
