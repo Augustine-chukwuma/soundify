@@ -1,6 +1,19 @@
 services:
-  - type: static
-    name: soundify-frontend
+  - type: web
+    name: soundify
+    env: node
+    plan: free
+    buildCommand: |
+      npm install
+    startCommand: |
+      node server.js
+    envVars:
+      - key: FIREBASE_PROJECT_ID
+        value: your-firebase-project-id
+      - key: FIREBASE_CLIENT_EMAIL
+        value: your-client-email-from-service-account
+      - key: FIREBASE_PRIVATE_KEY
+        value: '-----BEGIN PRIVATE KEY-----\nYOUR-PRIVATE-KEY\n-----END PRIVATE KEY-----\n'
+      - key: PORT
+        value: 3000
     staticPublishPath: public
-    buildCommand: ""
-    
