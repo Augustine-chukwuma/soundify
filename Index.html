@@ -1,1 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Soundify</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+  <style>
+    body { background: #121212; color: #fff; }
+    nav { background-color: #1f1f1f; }
+    .card { background: #1e1e1e; transition: transform 0.3s; }
+    .card:hover { transform: scale(1.03); }
+    .form-container { max-width: 400px; margin: auto; padding-top: 50px; }
+    .song-card audio { width: 100%; }
+  </style>
+</head>
+<body>
 
+  <nav>
+    <div class="nav-wrapper container">
+      <a href="#" class="brand-logo">Soundify</a>
+      <ul id="nav-mobile" class="right hide-on-med-and-down">
+        <li><a href="#login">Login</a></li>
+        <li><a href="#signup">Signup</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container" id="content">
+    <!-- Dynamic content goes here -->
+  </div>
+
+  <script>
+    const content = document.getElementById('content');
+
+    function renderLogin() {
+      content.innerHTML = `
+        <div class="form-container">
+          <div class="card-panel">
+            <h5>Login</h5>
+            <form id="loginForm">
+              <input type="text" name="username" placeholder="Username" required />
+              <input type="password" name="password" placeholder="Password" required />
+              <button class="btn waves-effect waves-light" type="submit">Login</button>
+            </form>
+          </div>
+        </div>`;
+    }
+
+    function renderSignup() {
+      content.innerHTML = `
+        <div class="form-container">
+          <div class="card-panel">
+            <h5>Signup</h5>
+            <form id="signupForm">
+              <input type="text" name="username" placeholder="Username" required />
+              <input type="password" name="password" placeholder="Password" required />
+              <button class="btn waves-effect waves-light" type="submit">Signup</button>
+            </form>
+          </div>
+        </div>`;
+    }
+
+    function renderSongs(songs) {
+      let html = '<div class="row">';
+      songs.forEach(song => {
+        html += `
+          <div class="col s12 m6 l4">
+            <div class="card song-card">
+              <div class="card-content">
+                <span class="card-title">${song.name}</span>
+                <audio controls src="${song.link}"></audio>
+              </div>
+              <div class="card-action">
+                <a href="${song.link}" download class="btn">Download</a>
+              </div>
+            </div>
+          </div>`;
+      });
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    // Router
+    window.addEventListener('hashchange', () => {
+      if (location.hash === '#signup') renderSignup();
+      else if (location.hash === '#login') renderLogin();
+      else loadSongs();
+    });
+
+    document.addEventListener('submit', async e => {
+      e.preventDefault();
+      const form = e.target;
+      const data = Object.fromEntries(new FormData(form).entries());
+      const endpoint = form.id === 'loginForm' ? '/login' : '/signup';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) loadSongs();
+      else M.toast({ html: 'Authentication failed' });
+    });
+
+    async function loadSongs() {
+      const res = await fetch('/songs');
+      const songs = await res.json();
+      renderSongs(songs);
+    }
+
+    // Initial view
+    loadSongs();
+  </script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+</body>
+</html>
